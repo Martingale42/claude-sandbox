@@ -52,7 +52,16 @@ for i in $(seq 1 10); do
 done
 echo "✓ SSH ready"
 
-# ─── 6. Copy Claude config into container ──────────────
+# ─── 6. Sync git identity from host ──────────────────────
+GIT_USER_NAME="$(git config --global user.name 2>/dev/null || echo '')"
+GIT_USER_EMAIL="$(git config --global user.email 2>/dev/null || echo '')"
+if [ -n "$GIT_USER_NAME" ] && [ -n "$GIT_USER_EMAIL" ]; then
+    docker exec -u claude "$CONTAINER_NAME" git config --global user.name "$GIT_USER_NAME"
+    docker exec -u claude "$CONTAINER_NAME" git config --global user.email "$GIT_USER_EMAIL"
+    echo "✓ Git identity synced: $GIT_USER_NAME <$GIT_USER_EMAIL>"
+fi
+
+# ─── 7. Copy Claude config into container ──────────────
 echo "→ Syncing Claude configuration..."
 
 # Copy entire ~/.claude directory (skills, settings, plugins, CLAUDE.md)
@@ -91,6 +100,9 @@ alias tl='"'"'tmux list-sessions 2>/dev/null && tmux list-windows -a 2>/dev/null
 alias tn='"'"'tmux new-session -s'"'"'
 BASHEOF'
 
+# Add GitHub host key (so git push via SSH works without prompt)
+docker exec -u claude "$CONTAINER_NAME" bash -c 'ssh-keyscan github.com >> /home/claude/.ssh/known_hosts 2>/dev/null'
+
 # Fix ownership inside container
 docker exec "$CONTAINER_NAME" chown -R claude:claude /home/claude/.claude /home/claude/.tmux.conf
 
@@ -112,6 +124,7 @@ Host claude-sandbox
     StrictHostKeyChecking no
     UserKnownHostsFile /dev/null
     LogLevel QUIET
+    ForwardAgent yes
 EOF
     chmod 600 "$SSH_CONFIG"
     echo "✓ SSH config added"

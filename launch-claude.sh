@@ -32,6 +32,14 @@ echo "✓ Project synced"
 docker cp "$HOME/.claude/.credentials.json" "$CONTAINER_NAME:/home/claude/.claude/.credentials.json"
 docker exec "$CONTAINER_NAME" chown claude:claude /home/claude/.claude/.credentials.json
 
+# ─── Convert HTTPS git remotes to SSH (for agent forwarding) ──
+ssh claude-sandbox "cd /home/claude/workspace/${PROJECT_NAME} && \
+    git remote -v 2>/dev/null | grep 'https://github.com' | awk '{print \$1}' | sort -u | while read remote; do \
+        url=\$(git remote get-url \$remote); \
+        new_url=\$(echo \$url | sed 's|https://github.com/|git@github.com:|'); \
+        git remote set-url \$remote \$new_url; \
+    done" 2>/dev/null || true
+
 # ─── Launch tmux + Claude inside container ──────────────
 echo "→ Launching Claude in tmux session '${SESSION_NAME}'..."
 ssh claude-sandbox "tmux new-session -d -s '${SESSION_NAME}' -c '/home/claude/workspace/${PROJECT_NAME}' 'claude --dangerously-skip-permissions' 2>/dev/null || true"

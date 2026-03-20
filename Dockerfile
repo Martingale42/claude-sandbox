@@ -37,7 +37,8 @@ RUN mkdir /var/run/sshd \
     && sed -i 's/#PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config \
     && sed -i 's/#PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config \
     && sed -i 's/#PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config \
-    && echo "AllowUsers claude" >> /etc/ssh/sshd_config
+    && echo "AllowUsers claude" >> /etc/ssh/sshd_config \
+    && sed -i 's/#AllowAgentForwarding yes/AllowAgentForwarding yes/' /etc/ssh/sshd_config
 
 # ─── Install Rust, uv, Claude Code (as claude user) ─────
 USER claude
@@ -75,8 +76,9 @@ ENV PATH="/home/claude/.local/bin:${PATH}"
 
 WORKDIR /home/claude
 
-# ─── SSH authorized keys ─────────────────────────────────
-RUN mkdir -p /home/claude/.ssh && chmod 700 /home/claude/.ssh
+# ─── SSH authorized keys + GitHub host key ───────────────
+RUN mkdir -p /home/claude/.ssh && chmod 700 /home/claude/.ssh \
+    && ssh-keyscan github.com >> /home/claude/.ssh/known_hosts 2>/dev/null
 
 # ─── Claude config directory structure ──────────────────
 RUN mkdir -p /home/claude/.claude/projects \
