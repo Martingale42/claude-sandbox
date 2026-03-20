@@ -225,6 +225,31 @@ tmux kill-session -t claude
 - 手機 SSH 上去也能 `tmux attach` 看 Claude 在幹嘛
 - 多個人可以同時 `tmux attach` 看同一個 session（pair programming）
 
+### tmux 嵌套：兩層 tmux 共存
+
+如果你在 host 的 tmux 裡 SSH 進 container，就會有兩層 tmux：
+
+```
+外層 tmux (host)
+└─ SSH 到 container
+   └─ 內層 tmux (container)
+      └─ Claude session
+```
+
+兩層都用 `Ctrl+B` 作為 prefix，外層永遠先攔截。怎麼操作內層？
+
+**按兩次 prefix：**
+
+```
+Ctrl+B → 外層收到，等待下一個按鍵
+Ctrl+B → 外層透過 send-prefix 轉發一個 Ctrl+B 給內層
+c      → 內層收到，建立新窗口
+```
+
+這是 tmux 的內建機制：`send-prefix`。當你按 `prefix prefix`，第一個被外層消費，第二個被當作輸入轉發給內層程式。因為內層程式也是 tmux，它就把這個 `Ctrl+B` 當成自己的 prefix。
+
+如果你覺得雙按太麻煩，也可以改內層 tmux 的 prefix（例如 `Ctrl+A`），但這需要維護兩份不同的 `.tmux.conf`。
+
 ### tmux 設定檔
 
 容器裡的 tmux 設定是從 host 複製過去的（`~/.tmux.conf`）。本專案的設定包含：
@@ -232,6 +257,7 @@ tmux kill-session -t claude
 - 滑鼠支援（可以用滑鼠選 pane）
 - `|` 和 `-` 分割視窗（比預設的 `%` 和 `"` 直覺）
 - `Alt+方向鍵` 切換 pane（不用按 prefix）
+- OSC 52 剪貼簿支援（跨 SSH 複製文字回本機）
 
 ---
 

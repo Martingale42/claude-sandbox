@@ -160,6 +160,22 @@ Claude 在 container 裡 commit + push，你在 host 或 Mac 端 `git pull`。
 
 ## 常見問題
 
+### Q: tmux 快捷鍵都被外層攔截了？
+
+如果你在 host 的 tmux 裡 SSH 進 container 的 tmux，會有兩層 tmux 嵌套，prefix key（`Ctrl+B`）永遠被外層先收到。
+
+**解法：按兩次 prefix，第二次會送進內層。**
+
+| 操作 | 外層 tmux | 內層 tmux（container） |
+|------|-----------|----------------------|
+| 新窗口 | `C-b c` | `C-b C-b c` |
+| 切窗口 | `C-b 1` | `C-b C-b 1` |
+| 水平分割 | `C-b \|` | `C-b C-b \|` |
+| 垂直分割 | `C-b -` | `C-b C-b -` |
+| detach | `C-b d` | `C-b C-b d` |
+
+原理：tmux 的 `send-prefix` 功能會把 `C-b C-b` 轉發一個 `C-b` 到內層。
+
 ### Q: setup.sh 跑到一半 SSH 連不上？
 
 等久一點。sshd 啟動需要幾秒，腳本會自動重試最多 10 次。如果還是不行：
