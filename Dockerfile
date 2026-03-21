@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-venv \
     build-essential \
+    clang \
     ca-certificates \
     gnupg \
     sudo \
@@ -71,6 +72,13 @@ ta() {
 }
 alias tl='tmux list-sessions 2>/dev/null && tmux list-windows -a 2>/dev/null || echo "No tmux sessions"'
 alias tn='tmux new-session -s'
+
+# ─── SSH agent forwarding fix for tmux ─────────────────
+# New SSH connections update the symlink; all shells (including tmux) use it
+if [ -n "$SSH_AUTH_SOCK" ] && [ "$SSH_AUTH_SOCK" != "$HOME/.ssh/agent.sock" ]; then
+    ln -sf "$SSH_AUTH_SOCK" "$HOME/.ssh/agent.sock"
+fi
+export SSH_AUTH_SOCK="$HOME/.ssh/agent.sock"
 BASHEOF
 ENV PATH="/home/claude/.local/bin:${PATH}"
 
