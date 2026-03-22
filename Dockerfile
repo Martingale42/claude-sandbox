@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM ubuntu:24.04
 
 # Avoid interactive prompts
@@ -22,6 +23,7 @@ RUN apt-get update && apt-get install -y \
     gnupg \
     sudo \
     locales \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # ─── Locale ─────────────────────────────────────────────
@@ -51,12 +53,16 @@ ENV PATH="/home/claude/.cargo/bin:${PATH}"
 # uv (Python package manager)
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
+# Bun (JavaScript runtime/bundler)
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH="/home/claude/.bun/bin:${PATH}"
+
 # Claude Code (native binary)
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
 # Persist PATH for interactive SSH sessions
-RUN echo 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"' >> /home/claude/.bashrc \
-    && echo 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"' >> /home/claude/.profile
+RUN echo 'export PATH="$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:$PATH"' >> /home/claude/.bashrc \
+    && echo 'export PATH="$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:$PATH"' >> /home/claude/.profile
 
 # ─── Shell helpers (tmux) ────────────────────────────────
 RUN cat >> /home/claude/.bashrc << 'BASHEOF'
@@ -101,7 +107,7 @@ RUN mkdir -p /home/claude/workspace
 USER root
 
 # ─── System-wide PATH for all SSH session types ─────────
-RUN echo 'PATH=/home/claude/.local/bin:/home/claude/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' > /etc/environment
+RUN echo 'PATH=/home/claude/.bun/bin:/home/claude/.local/bin:/home/claude/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' > /etc/environment
 
 EXPOSE 22
 
