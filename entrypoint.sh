@@ -11,7 +11,7 @@ fi
 
 echo "══════════════════════════════════════════════════"
 echo "  Claude Sandbox is running"
-echo "  SSH: ssh -p 2222 claude@localhost"
+echo "  Container: $(hostname)"
 echo "══════════════════════════════════════════════════"
 
 # Keep container alive

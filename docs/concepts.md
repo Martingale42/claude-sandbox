@@ -44,7 +44,7 @@
 容器透過 Linux kernel 的兩個機制實現隔離：
 
 - **Namespaces**：讓容器有自己的 PID、網路、檔案系統、hostname，看不到 host 的其他 process
-- **Cgroups**：限制容器能用多少 CPU、記憶體
+- **Cgroups**：限制容器能用多少 CPU、記憶體（claude-sandbox 預設限制 4 CPUs, 8GB RAM）
 
 ### 這對 claude-sandbox 的意義
 
@@ -60,8 +60,8 @@
 容器應該被當成可拋棄的。你可以隨時：
 
 ```bash
-docker rm -f claude-sandbox   # 砍掉
-./setup.sh                     # 3 分鐘後又是一個全新的環境
+docker rm -f claude-sandbox-project-a   # 砍掉
+./setup.sh project-a                     # 3 分鐘後又是一個全新的環境
 ```
 
 所以我們把有價值的產出（程式碼）用 git push 送出去，而不是存在容器裡。
@@ -74,7 +74,7 @@ docker rm -f claude-sandbox   # 砍掉
 # host 上有 ~/.claude/skills/adapt, skills/animate, ...
 # container 裡 Dockerfile 已經 mkdir -p 了 ~/.claude/skills/
 
-docker cp ~/.claude/skills container:/home/claude/.claude/skills
+docker cp ~/.claude/skills claude-sandbox-project-a:/home/claude/.claude/skills
 # 你以為：skills/adapt, skills/animate, ...
 # 實際上：skills/skills/adapt, skills/skills/animate, ...  ← 多了一層！
 ```
@@ -84,8 +84,8 @@ docker cp ~/.claude/skills container:/home/claude/.claude/skills
 **解法：** 複製前先刪掉目的地目錄。
 
 ```bash
-docker exec container rm -rf /home/claude/.claude/skills
-docker cp ~/.claude/skills container:/home/claude/.claude/skills
+docker exec claude-sandbox-project-a rm -rf /home/claude/.claude/skills
+docker cp ~/.claude/skills claude-sandbox-project-a:/home/claude/.claude/skills
 ```
 
 ---
@@ -145,9 +145,9 @@ Mac ──SSH──► Linux Server ──SSH──► Container:2222
 在 `~/.ssh/config` 裡：
 
 ```
-Host claude-sandbox
+Host sandbox-project-a
     HostName localhost          ← 目的地（從 Linux server 的角度看）
-    Port 2222
+    Port 2222                   ← 自動分配的 port（見 .instances/project-a）
     User claude
     ProxyJump linux-server      ← 先跳到這裡
 ```
@@ -269,7 +269,7 @@ c      → 內層收到，建立新窗口
 
 ```bash
 # 從 host 看
-$ docker inspect claude-sandbox | grep IPAddress
+$ docker inspect claude-sandbox-project-a | grep IPAddress
 "IPAddress": "172.17.0.5"
 ```
 
@@ -278,16 +278,16 @@ $ docker inspect claude-sandbox | grep IPAddress
 ### Port Forwarding（-p 參數）
 
 ```bash
-docker run -p 2222:22 ...
+docker run -p <port>:22 ...
 ```
 
-這告訴 Docker：「host 的 port 2222 收到的流量，轉發到容器的 port 22。」
+這告訴 Docker：「host 的指定 port 收到的流量，轉發到容器的 port 22。」每個 sandbox 實例分配到不同的 host port。
 
 ```
-外部 ──► host:2222 ──► (Docker NAT) ──► container:22 (sshd)
+外部 ──► host:<port> ──► (Docker NAT) ──► container:22 (sshd)
 ```
 
-所以 `ssh -p 2222 claude@localhost` 實際上是連到容器裡的 sshd。
+所以 `ssh -p <port> claude@localhost` 實際上是連到容器裡的 sshd。每個 sandbox 實例會自動分配不同的 port（從 2222 開始遞增），紀錄在 `.instances/<name>` 檔案中。
 
 ### 容器對外的存取
 
@@ -297,7 +297,7 @@ docker run -p 2222:22 ...
 
 | 方向 | 狀態 | 用途 |
 |------|------|------|
-| 外 → 容器 | 只開 port 22（映射到 host:2222） | SSH/Zed 連入 |
+| 外 → 容器 | 只開 port 22（映射到 host 的自動分配 port） | SSH/Zed 連入 |
 | 容器 → 外 | 完全開放 | git push、pip install、curl 等 |
 
 ---
@@ -308,7 +308,7 @@ docker run -p 2222:22 ...
 
 ### 問題
 
-Rust（`~/.cargo/bin`）、uv（`~/.local/bin`）、Claude Code（`~/.local/bin`）都裝在使用者的 home 目錄下，不在系統預設的 PATH 裡。如果 PATH 沒設好，SSH 進去後打 `claude` 會得到 `command not found`。
+Rust（`~/.cargo/bin`）、uv（`~/.local/bin`）、Bun（`~/.bun/bin`）、Claude Code（`~/.local/bin`）都裝在使用者的 home 目錄下，不在系統預設的 PATH 裡。如果 PATH 沒設好，SSH 進去後打 `claude` 會得到 `command not found`。
 
 你可能會想：「放進 `.bashrc` 不就好了？」但 SSH 有不同的 shell 模式，各自讀不同的設定檔。
 
@@ -334,13 +334,13 @@ bash 啟動 ──────────┤
 | `ssh host "command"` | 非互動式 non-login | X | X |
 | `ssh host "bash -lc 'command'"` | 強制 login shell | O | O |
 
-關鍵的第三行：`launch-claude.sh` 用的就是 `ssh host "tmux new-session ..."` 這種模式。如果只把 PATH 寫在 `.bashrc`，這個指令就會找不到 `claude`。
+關鍵的第三行：`launch-claude.sh` 用的就是 `ssh sandbox-<name> "tmux new-session ..."` 這種模式。如果只把 PATH 寫在 `.bashrc`，這個指令就會找不到 `claude`。
 
 ### 解法：/etc/environment
 
 ```bash
 # /etc/environment
-PATH=/home/claude/.local/bin:/home/claude/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+PATH=/home/claude/.bun/bin:/home/claude/.local/bin:/home/claude/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ```
 
 `/etc/environment` 是 PAM（Pluggable Authentication Module）層級的設定。PAM 是 Linux 的認證框架，SSH 登入時會經過 PAM，PAM 的 `pam_env` 模組會讀 `/etc/environment` 並注入環境變數。
@@ -409,7 +409,7 @@ Claude 想要執行：rm -rf node_modules
     └── cache/
 ```
 
-`setup.sh` 會把這整套複製進容器，所以容器裡的 Claude 跟你 host 上的 Claude 有完全相同的技能和設定。
+`setup.sh` 會把這整套複製進每個實例，所以容器裡的 Claude 跟你 host 上的 Claude 有完全相同的技能和設定。
 
 ### 容器內的開發工具鏈
 
@@ -419,6 +419,7 @@ Claude 想要執行：rm -rf node_modules
 |------|----------|------|
 | Rust (rustc, cargo) | `~/.cargo/bin/` | 編譯 Rust 專案 |
 | uv | `~/.local/bin/` | 現代 Python 套件管理器，取代 pip + venv |
+| Bun | `~/.bun/bin/` | JavaScript runtime/bundler，前端編譯和開發伺服器 |
 | Python 3 | `/usr/bin/` | 系統 Python，uv 會管理專案虛擬環境 |
 | ripgrep (rg) | `/usr/bin/` | Claude Code 內部搜尋用 |
 | git | `/usr/bin/` | 版本控制、推送成果 |
@@ -432,8 +433,8 @@ Claude 的 `.credentials.json` 包含 OAuth token，有時效性。如果 token 
 `launch-claude.sh` 每次執行都會重新同步 credentials，就是為了處理這個問題。如果你長時間使用同一個 container，token 過期時需要手動重新同步：
 
 ```bash
-docker cp ~/.claude/.credentials.json claude-sandbox:/home/claude/.claude/.credentials.json
-docker exec claude-sandbox chown claude:claude /home/claude/.claude/.credentials.json
+docker cp ~/.claude/.credentials.json claude-sandbox-<name>:/home/claude/.claude/.credentials.json
+docker exec claude-sandbox-<name> chown claude:claude /home/claude/.claude/.credentials.json
 ```
 
 ---
