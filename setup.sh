@@ -2,7 +2,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGE_NAME="claude-sandbox"
 INSTANCE_DIR="$SCRIPT_DIR/.instances"
 SSH_KEY_DIR="$SCRIPT_DIR/.ssh"
 BASE_PORT=2222
@@ -10,6 +9,16 @@ BASE_PORT=2222
 # ─── Defaults (override via env vars) ─────────────────────
 SANDBOX_CPUS="${SANDBOX_CPUS:-4}"
 SANDBOX_MEMORY="${SANDBOX_MEMORY:-8g}"
+SANDBOX_BROWSER="${SANDBOX_BROWSER:-0}"
+
+# ─── Image selection ──────────────────────────────────────
+if [ "$SANDBOX_BROWSER" = "1" ]; then
+    BUILD_TARGET="browser"
+    IMAGE_NAME="claude-sandbox-browser"
+else
+    BUILD_TARGET="base"
+    IMAGE_NAME="claude-sandbox"
+fi
 
 # ─── Parse arguments ──────────────────────────────────────
 INSTANCE_NAME="${1:-default}"
@@ -17,7 +26,7 @@ CONTAINER_NAME="claude-sandbox-${INSTANCE_NAME}"
 SSH_HOST="sandbox-${INSTANCE_NAME}"
 
 echo "═══ Claude Sandbox Setup: ${INSTANCE_NAME} ═══"
-echo "  CPUs: ${SANDBOX_CPUS}  Memory: ${SANDBOX_MEMORY}"
+echo "  CPUs: ${SANDBOX_CPUS}  Memory: ${SANDBOX_MEMORY}  Browser: ${SANDBOX_BROWSER}"
 
 # ─── 1. Generate SSH key pair (shared across instances) ────
 mkdir -p "$SSH_KEY_DIR"
@@ -30,10 +39,10 @@ else
     echo "✓ SSH key already exists"
 fi
 
-# ─── 2. Build Docker image (once, shared) ─────────────────
-echo "→ Building Docker image..."
-docker build -t "$IMAGE_NAME" "$SCRIPT_DIR"
-echo "✓ Image built"
+# ─── 2. Build Docker image ─────────────────────────────────
+echo "→ Building Docker image (target: ${BUILD_TARGET})..."
+docker build --target "$BUILD_TARGET" -t "$IMAGE_NAME" "$SCRIPT_DIR"
+echo "✓ Image built: ${IMAGE_NAME}"
 
 # ─── 3. Resolve SSH port ──────────────────────────────────
 mkdir -p "$INSTANCE_DIR"

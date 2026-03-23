@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM ubuntu:24.04
+FROM ubuntu:24.04 AS base
 
 # Avoid interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
@@ -115,4 +115,46 @@ EXPOSE 22
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+ENTRYPOINT ["/entrypoint.sh"]
+
+# ═══════════════════════════════════════════════════════
+# Browser stage: adds Chromium + Playwright
+# Build with: docker build --target browser
+# ═══════════════════════════════════════════════════════
+FROM base AS browser
+
+# System dependencies required by Chromium
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    fonts-liberation \
+    libasound2t64 \
+    libatk-bridge2.0-0t64 \
+    libatk1.0-0t64 \
+    libatspi2.0-0t64 \
+    libcairo2 \
+    libcups2t64 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libglib2.0-0t64 \
+    libnspr4 \
+    libnss3 \
+    libpango-1.0-0 \
+    libx11-6 \
+    libxcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxkbcommon0 \
+    libxrandr2 \
+    xdg-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Playwright + Chromium browser binary
+USER claude
+RUN bunx playwright install chromium
+
+# Back to root for entrypoint
+USER root
 ENTRYPOINT ["/entrypoint.sh"]
