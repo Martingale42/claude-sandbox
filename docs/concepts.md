@@ -423,8 +423,11 @@ Claude 想要執行：rm -rf node_modules
 | Python 3 | `/usr/bin/` | 系統 Python，uv 會管理專案虛擬環境 |
 | ripgrep (rg) | `/usr/bin/` | Claude Code 內部搜尋用 |
 | git | `/usr/bin/` | 版本控制、推送成果 |
+| Chromium + Playwright | `~/.cache/ms-playwright/` | headless 瀏覽器（僅 browser 版，`SANDBOX_BROWSER=1`） |
 
 這些工具的 PATH 透過 `/etc/environment` 設定（原因見 [Shell 環境與 PATH 載入](#5-shell-環境與-path-載入)）。
+
+> **Note:** Chromium 和 Playwright 只在用 `SANDBOX_BROWSER=1` 建立的實例中可用。base 版不含瀏覽器，image 較小。
 
 ### 為什麼 credentials 需要特別處理？
 

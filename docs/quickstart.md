@@ -53,10 +53,22 @@ cd ~/Code/claude-sandbox
 SANDBOX_CPUS=8 SANDBOX_MEMORY=16g ./setup.sh heavy-job
 ```
 
+需要瀏覽器（前端開發、Playwright 截圖/操作）：
+
+```bash
+SANDBOX_BROWSER=1 ./setup.sh my-frontend
+```
+
+環境變數可以組合使用：
+
+```bash
+SANDBOX_BROWSER=1 SANDBOX_CPUS=8 SANDBOX_MEMORY=16g ./setup.sh my-frontend
+```
+
 這個腳本會自動完成以下事情（你不需要手動做）：
 
 1. 產生一組 SSH key pair（存在 `claude-sandbox/.ssh/sandbox_key`，所有實例共用）
-2. 用 Dockerfile build 出 Docker image（只 build 一次）
+2. 用 Dockerfile build 出 Docker image（`base` 或 `browser` target）
 3. 啟動 container `claude-sandbox-<name>`，自動分配 SSH port
 4. 套用 CPU 和記憶體資源限制
 5. 把你的 Claude 設定檔（skills、plugins、settings、credentials）和 tmux 設定複製進 container
@@ -175,9 +187,9 @@ Claude 在 container 裡 commit + push，你在 host 或 Mac 端 `git pull`。
 
 ```bash
 # 建立多個實例
-./setup.sh project-a
-./setup.sh project-b
-SANDBOX_CPUS=8 SANDBOX_MEMORY=16g ./setup.sh ml-training
+./setup.sh project-a                                       # base
+SANDBOX_BROWSER=1 ./setup.sh project-b                     # 含瀏覽器
+SANDBOX_CPUS=8 SANDBOX_MEMORY=16g ./setup.sh ml-training   # 自訂資源
 
 # 各自送入專案
 ./launch-claude.sh project-a ~/Code/project-a

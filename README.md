@@ -65,13 +65,19 @@ ssh -tt sandbox-project-b "bash -lic 'ta claude'"
 SANDBOX_CPUS=8 SANDBOX_MEMORY=16g ./setup.sh heavy-job
 ```
 
+需要瀏覽器（Playwright 截圖、前端 review）：
+
+```bash
+SANDBOX_BROWSER=1 ./setup.sh my-frontend
+```
+
 詳細步驟請看 [quickstart.md](docs/quickstart.md)。
 
 ## 檔案結構
 
 ```
 claude-sandbox/
-├── Dockerfile          # 容器定義：Ubuntu 24.04 + sshd + Claude Code + Rust + uv + Bun
+├── Dockerfile          # 容器定義（multi-stage: base + browser）
 ├── entrypoint.sh       # 容器啟動腳本：跑 sshd、保持容器存活
 ├── setup.sh            # 建置腳本：build image + 啟動實例 + 同步設定
 ├── launch-claude.sh    # 把專案送進指定實例 + 啟動 Claude
