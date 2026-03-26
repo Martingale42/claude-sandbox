@@ -26,6 +26,11 @@ RUN apt-get update && apt-get install -y \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
+# ─── Node.js LTS (provides node, npm, npx) ────────────
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
 # ─── Locale ─────────────────────────────────────────────
 RUN locale-gen en_US.UTF-8
 ENV LANG=en_US.UTF-8
