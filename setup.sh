@@ -10,14 +10,23 @@ BASE_PORT=2222
 SANDBOX_CPUS="${SANDBOX_CPUS:-4}"
 SANDBOX_MEMORY="${SANDBOX_MEMORY:-8g}"
 SANDBOX_BROWSER="${SANDBOX_BROWSER:-0}"
+SANDBOX_CUDA="${SANDBOX_CUDA:-0}"
+CUDA_BASE_IMAGE="nvidia/cuda:12.6.3-devel-ubuntu24.04"
 
 # ─── Image selection ──────────────────────────────────────
+IMAGE_NAME="claude-sandbox"
+BASE_IMAGE="ubuntu:24.04"
+GPU_ARGS=()
+if [ "$SANDBOX_CUDA" = "1" ]; then
+    IMAGE_NAME="${IMAGE_NAME}-cuda"
+    BASE_IMAGE="$CUDA_BASE_IMAGE"
+    GPU_ARGS=(--gpus all)
+fi
 if [ "$SANDBOX_BROWSER" = "1" ]; then
     BUILD_TARGET="browser"
-    IMAGE_NAME="claude-sandbox-browser"
+    IMAGE_NAME="${IMAGE_NAME}-browser"
 else
     BUILD_TARGET="base"
-    IMAGE_NAME="claude-sandbox"
 fi
 
 # ─── Parse arguments ──────────────────────────────────────
@@ -26,7 +35,7 @@ CONTAINER_NAME="claude-sandbox-${INSTANCE_NAME}"
 SSH_HOST="sandbox-${INSTANCE_NAME}"
 
 echo "═══ Claude Sandbox Setup: ${INSTANCE_NAME} ═══"
-echo "  CPUs: ${SANDBOX_CPUS}  Memory: ${SANDBOX_MEMORY}  Browser: ${SANDBOX_BROWSER}"
+echo "  CPUs: ${SANDBOX_CPUS}  Memory: ${SANDBOX_MEMORY}  Browser: ${SANDBOX_BROWSER}  CUDA: ${SANDBOX_CUDA}"
 
 # ─── 1. Generate SSH key pair (shared across instances) ────
 mkdir -p "$SSH_KEY_DIR"
@@ -40,8 +49,8 @@ else
 fi
 
 # ─── 2. Build Docker image ─────────────────────────────────
-echo "→ Building Docker image (target: ${BUILD_TARGET})..."
-docker build --target "$BUILD_TARGET" -t "$IMAGE_NAME" "$SCRIPT_DIR"
+echo "→ Building Docker image (target: ${BUILD_TARGET}, base: ${BASE_IMAGE})..."
+docker build --target "$BUILD_TARGET" --build-arg BASE_IMAGE="$BASE_IMAGE" -t "$IMAGE_NAME" "$SCRIPT_DIR"
 echo "✓ Image built: ${IMAGE_NAME}"
 
 # ─── 3. Resolve SSH port ──────────────────────────────────
@@ -74,6 +83,7 @@ docker run -d \
     --hostname "$CONTAINER_NAME" \
     --cpus="$SANDBOX_CPUS" \
     --memory="$SANDBOX_MEMORY" \
+    "${GPU_ARGS[@]}" \
     -p "${SSH_PORT}:22" \
     -v "$SSH_KEY_DIR/sandbox_key.pub:/home/claude/.ssh/authorized_keys:ro" \
     "$IMAGE_NAME"

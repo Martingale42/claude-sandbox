@@ -1,5 +1,7 @@
 # syntax=docker/dockerfile:1
-FROM ubuntu:24.04 AS base
+# setup.sh passes nvidia/cuda:<ver>-devel-ubuntu24.04 here when SANDBOX_CUDA=1
+ARG BASE_IMAGE=ubuntu:24.04
+FROM ${BASE_IMAGE} AS base
 
 # Avoid interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
@@ -112,7 +114,9 @@ RUN mkdir -p /home/claude/workspace
 USER root
 
 # ─── System-wide PATH for all SSH session types ─────────
-RUN echo 'PATH=/home/claude/.bun/bin:/home/claude/.local/bin:/home/claude/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' > /etc/environment
+# SSH sessions don't inherit the image's ENV, so the CUDA image's nvcc must be listed here
+RUN cuda_bin=""; [ -d /usr/local/cuda/bin ] && cuda_bin="/usr/local/cuda/bin:"; \
+    echo "PATH=/home/claude/.bun/bin:/home/claude/.local/bin:/home/claude/.cargo/bin:${cuda_bin}/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" > /etc/environment
 
 EXPOSE 22
 

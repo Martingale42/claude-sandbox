@@ -37,6 +37,11 @@
 │  │  ...（同上結構）                                        │   │      │
 │  │  + Chromium + Playwright (SANDBOX_BROWSER=1)           │   │      │
 │  └────────────────────────────────────────────────────────┘   │      │
+│  ┌─ claude-sandbox-small-vllm (cuda) ─────────────────────┐   │      │
+│  │  (--cpus=16 --memory=32g --gpus all)                   │   │      │
+│  │  ...（同上結構）                                        │   │      │
+│  │  + CUDA 12.6 toolkit: nvcc, ncu (SANDBOX_CUDA=1)       │   │      │
+│  └────────────────────────────────────────────────────────┘   │      │
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -63,6 +68,7 @@ Port 分配策略：從 2222 開始遞增，自動尋找下一個可用 port。�
 | `SANDBOX_CPUS` | `4` | CPU 核心數限制 |
 | `SANDBOX_MEMORY` | `8g` | 記憶體限制 |
 | `SANDBOX_BROWSER` | `0` | 設為 `1` 啟用 Chromium + Playwright |
+| `SANDBOX_CUDA` | `0` | 設為 `1` 改用 CUDA 12.6 devel base image 並加上 `--gpus all` |
 
 ```bash
 # 例：分配 8 CPUs 和 16GB RAM
@@ -70,6 +76,9 @@ SANDBOX_CPUS=8 SANDBOX_MEMORY=16g ./setup.sh heavy-job
 
 # 例：含瀏覽器的前端開發實例
 SANDBOX_BROWSER=1 ./setup.sh my-frontend
+
+# 例：GPU 開發實例（可與 SANDBOX_BROWSER 組合）
+SANDBOX_CUDA=1 SANDBOX_CPUS=16 SANDBOX_MEMORY=32g ./setup.sh small-vllm
 ```
 
 CPU/Memory 底層使用 Docker 的 `--cpus` 和 `--memory` 參數，映射到 Linux cgroups v2 資源控制。
@@ -77,7 +86,7 @@ CPU/Memory 底層使用 Docker 的 `--cpus` 和 `--memory` 參數，映射到 Li
 ### 共享資源
 
 所有實例共用：
-- **Docker image**：`claude-sandbox`（base）或 `claude-sandbox-browser`（含瀏覽器），Docker layer cache 共享 base 層
+- **Docker image**：`claude-sandbox`（base）或 `claude-sandbox-browser`（含瀏覽器）；`SANDBOX_CUDA=1` 時為 `claude-sandbox-cuda` / `claude-sandbox-cuda-browser`。Docker layer cache 只在同一個 base image 之間共享
 - **SSH key pair**：`.ssh/sandbox_key`，所有實例的 authorized_keys 都指向同一把公鑰
 - **Host 的 Claude 設定**：每個實例獨立複製一份（setup 時 snapshot）
 
@@ -206,6 +215,20 @@ browser ← 繼承 base，加裝 Chromium + Playwright
 | `/etc/environment` | 系統層級 PATH 設定，確保所有 SSH 模式都能找到工具（見下方說明） |
 | 目錄結構 | 預建 `.claude/`、`.ssh/`、`workspace/`，避免 runtime 權限問題 |
 
+#### CUDA base image（`SANDBOX_CUDA=1`）
+
+Dockerfile 開頭是 `ARG BASE_IMAGE=ubuntu:24.04` 與 `FROM ${BASE_IMAGE} AS base`。`SANDBOX_CUDA=1` 時 `setup.sh` 傳入 `nvidia/cuda:12.6.3-devel-ubuntu24.04`，其餘各層完全相同。這個 image 提供：
+
+| 項目 | 說明 |
+|------|------|
+| CUDA 12.6 toolkit | `/usr/local/cuda/bin/` 下的 `nvcc`、`ncu` 與 cuBLAS 等開發用 header/library |
+| GPU 存取 | `docker run --gpus all` 由 NVIDIA Container Toolkit 注入 driver library 與 `nvidia-smi` |
+
+兩個值得注意的地方：
+
+- **PATH**：CUDA image 用 Docker `ENV` 把 `/usr/local/cuda/bin` 加進 PATH，但 sshd 開的 session 不繼承 `ENV`，所以 Dockerfile 在偵測到 `/usr/local/cuda/bin` 時把它寫進 `/etc/environment`。
+- **UID**：`ubuntu:24.04` 和 `nvidia/cuda` 的 ubuntu24.04 image 都自帶 UID 1000 的 `ubuntu` 使用者，`useradd claude` 因此拿到 UID 1001；兩種 base 行為一致，不需要另外處理。
+
 #### browser stage
 
 | 層 | 職責 |
@@ -239,7 +262,7 @@ tail -f /dev/null # 讓 PID 1 永遠存活，container 不會退出
 - Port 已分配就複用
 - SSH config 用 marker 確保可覆寫
 
-接受一個 `<name>` 參數（預設 `default`），支援 `SANDBOX_CPUS`、`SANDBOX_MEMORY` 和 `SANDBOX_BROWSER` 環境變數。根據 `SANDBOX_BROWSER` 選擇 build target（`base` 或 `browser`）和對應的 image tag。
+接受一個 `<name>` 參數（預設 `default`），支援 `SANDBOX_CPUS`、`SANDBOX_MEMORY`、`SANDBOX_BROWSER` 和 `SANDBOX_CUDA` 環境變數。根據 `SANDBOX_BROWSER` 選擇 build target（`base` 或 `browser`），根據 `SANDBOX_CUDA` 選擇 `BASE_IMAGE` build arg 與是否加 `--gpus all`，兩者共同決定 image tag。
 
 #### docker cp 的目錄陷阱
 
@@ -321,12 +344,13 @@ docker run --network claude-net ...
 
 但這會讓 git push 和 pip install 失效，需要設定 proxy。
 
-### GPU passthrough
+### Nsight Compute 效能計數器
 
-如果 Claude 需要跑 ML 相關工具：
+`SANDBOX_CUDA=1` 的實例已內建 `ncu`（Nsight Compute CLI），但讀取 GPU 效能計數器需要權限。host driver 預設 `RmProfilingAdminOnly=1`，只允許 admin 讀取，所以 container 需要 `SYS_ADMIN` capability，並以 `sudo ncu ...` 執行：
 
 ```bash
-docker run --gpus all ...
+# 在 setup.sh 的 docker run 加上這一行（預設不啟用）
+    --cap-add SYS_ADMIN \
 ```
 
-需要 host 有 NVIDIA Container Toolkit。
+`SYS_ADMIN` 會大幅放寬 container 的權限（例如 mount），只在需要 profiling 的實例上開。

@@ -71,13 +71,19 @@ SANDBOX_CPUS=8 SANDBOX_MEMORY=16g ./setup.sh heavy-job
 SANDBOX_BROWSER=1 ./setup.sh my-frontend
 ```
 
+需要 NVIDIA GPU（CUDA 12.6 toolkit + `--gpus all`，host 需裝 NVIDIA Container Toolkit）：
+
+```bash
+SANDBOX_CUDA=1 SANDBOX_CPUS=16 SANDBOX_MEMORY=32g ./setup.sh my-gpu-project
+```
+
 詳細步驟請看 [quickstart.md](docs/quickstart.md)。
 
 ## 檔案結構
 
 ```
 claude-sandbox/
-├── Dockerfile          # 容器定義（multi-stage: base + browser）
+├── Dockerfile          # 容器定義（multi-stage: base + browser；BASE_IMAGE 可換成 CUDA）
 ├── entrypoint.sh       # 容器啟動腳本：跑 sshd、保持容器存活
 ├── setup.sh            # 建置腳本：build image + 啟動實例 + 同步設定
 ├── launch-claude.sh    # 把專案送進指定實例 + 啟動 Claude
