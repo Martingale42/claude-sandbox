@@ -398,18 +398,19 @@ Claude 想要執行：rm -rf node_modules
 ```
 ~/.claude/
 ├── CLAUDE.md           ← 全域指示，影響 Claude 的行為
-├── settings.json       ← 啟用的 plugins、權限設定
+├── settings.json       ← 啟用的 plugins、權限設定、hooks
 ├── .credentials.json   ← API 認證 token
 ├── skills/             ← 自訂技能（slash commands）
 │   ├── brainstorming/
 │   ├── systematic-debugging/
 │   └── ...
-└── plugins/            ← 已安裝的 plugins
-    ├── installed_plugins.json
-    └── cache/
+├── plugins/            ← 已安裝的 plugins
+│   ├── installed_plugins.json
+│   └── cache/
+└── hooks/              ← settings.json 裡 hook 指令用到的腳本
 ```
 
-`setup.sh` 會把這整套複製進每個實例，所以容器裡的 Claude 跟你 host 上的 Claude 有完全相同的技能和設定。
+`setup.sh`（透過 `sync-config.sh`）會把這整套複製進每個實例，所以容器裡的 Claude 跟你 host 上的 Claude 有完全相同的技能和設定。唯一的例外是 hooks：見 [architecture.md 的 sync-config.sh](architecture.md#sync-configsh)。
 
 ### 容器內的開發工具鏈
 

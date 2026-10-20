@@ -86,6 +86,7 @@ claude-sandbox/
 ├── Dockerfile          # 容器定義（multi-stage: base + browser；BASE_IMAGE 可換成 CUDA）
 ├── entrypoint.sh       # 容器啟動腳本：跑 sshd、保持容器存活
 ├── setup.sh            # 建置腳本：build image + 啟動實例 + 同步設定
+├── sync-config.sh      # 把 host 的 Claude 設定同步進執行中的實例（setup.sh 會呼叫）
 ├── launch-claude.sh    # 把專案送進指定實例 + 啟動 Claude
 ├── sync-back.sh        # 把容器內的檔案拉回 host（備用）
 ├── .instances/         # 實例 port 對照（gitignored，由 setup.sh 管理）

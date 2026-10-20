@@ -112,24 +112,10 @@ if [ -n "$GIT_USER_NAME" ] && [ -n "$GIT_USER_EMAIL" ]; then
 fi
 
 # ─── 8. Copy Claude config into container ──────────────────
-echo "→ Syncing Claude configuration..."
-
-docker cp "$HOME/.claude/CLAUDE.md" "$CONTAINER_NAME:/home/claude/.claude/CLAUDE.md"
-docker cp "$HOME/.claude/settings.json" "$CONTAINER_NAME:/home/claude/.claude/settings.json"
-docker exec "$CONTAINER_NAME" rm -rf /home/claude/.claude/skills /home/claude/.claude/plugins
-docker cp "$HOME/.claude/skills" "$CONTAINER_NAME:/home/claude/.claude/skills"
-docker cp "$HOME/.claude/plugins" "$CONTAINER_NAME:/home/claude/.claude/plugins"
-
-docker cp "$HOME/.claude/.credentials.json" "$CONTAINER_NAME:/home/claude/.claude/.credentials.json"
-docker cp "$HOME/.tmux.conf" "$CONTAINER_NAME:/home/claude/.tmux.conf"
+"$SCRIPT_DIR/sync-config.sh" "$INSTANCE_NAME"
 
 # Add GitHub host key
 docker exec -u claude "$CONTAINER_NAME" bash -c 'ssh-keyscan github.com >> /home/claude/.ssh/known_hosts 2>/dev/null'
-
-# Fix ownership
-docker exec "$CONTAINER_NAME" chown -R claude:claude /home/claude/.claude /home/claude/.tmux.conf
-
-echo "✓ Configuration synced"
 
 # ─── 9. Setup SSH config on host ──────────────────────────
 SSH_CONFIG="$HOME/.ssh/config"

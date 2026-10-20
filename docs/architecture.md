@@ -26,7 +26,7 @@
 │  │    └──► claude user                                         │      │
 │  │          ├─ tmux session "claude"                           │      │
 │  │          │   └─ claude --dangerously-skip-permissions       │      │
-│  │          ├─ ~/.claude/ (skills, plugins, settings, creds)   │      │
+│  │          ├─ ~/.claude/ (skills, plugins, hooks, settings)   │      │
 │  │          ├─ ~/.cargo/bin/ (rustc, cargo)                    │      │
 │  │          ├─ ~/.bun/bin/ (bun)                               │      │
 │  │          ├─ ~/.local/bin/ (claude, uv)                      │      │
@@ -279,6 +279,18 @@ docker cp ~/.claude/skills container:/home/claude/.claude/skills
 ```
 
 `docker cp SRC DEST` 的行為：如果 `DEST` 已存在且是目錄，會把 `SRC` 放進 `DEST` 裡面（類似 `mv`），而不是覆蓋。這跟 `cp -r` 的行為不同。
+
+### sync-config.sh
+
+把 host 的 Claude 設定（`CLAUDE.md`、`settings.json`、`skills/`、`plugins/`、`hooks/`、credentials）和 `~/.tmux.conf` 複製進執行中的實例。`setup.sh` 在第 8 步呼叫它；host 設定改了之後也可以單獨跑 `./sync-config.sh <name>`，不會重建 container，`~/workspace` 保留。
+
+`settings.json` 不能原封不動複製，因為 hook 指令用絕對路徑指向 host 上的腳本（例如 `/home/<host-user>/.claude/hooks/...`），而 container 裡的使用者是 `claude`。同步時在 host 的暫存檔上處理，host 的 `settings.json` 不會被修改：
+
+1. 把所有 `$HOME/` 換成 `/home/claude/`
+2. 找出 hook 指令裡引用的 `/home/claude/...` 路徑，逐一在 container 裡檢查是否存在
+3. 只要有一個路徑不存在，就整個拿掉那個 hook，並印出 `⚠ dropping hook, not in container: <path>`
+
+第 3 步是必要的：缺檔的腳本讓 `python`/`uv run --script` 以 exit code 2 結束，而 Claude Code 把 `UserPromptSubmit` hook 的 exit code 2 當成「擋下這個 prompt」，結果每個 prompt 都會被擋。只在 host 上有意義的 hook（例如 `~/.tmux/` 下的 tmux 輔助腳本）因此不會出現在 container 裡；要讓它在 container 裡生效，就把腳本放進 `~/.claude/hooks/`。
 
 ### launch-claude.sh
 

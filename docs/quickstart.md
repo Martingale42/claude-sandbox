@@ -77,7 +77,7 @@ SANDBOX_BROWSER=1 SANDBOX_CPUS=8 SANDBOX_MEMORY=16g ./setup.sh my-frontend
 2. 用 Dockerfile build 出 Docker image（`base` 或 `browser` target；`SANDBOX_CUDA=1` 時換成 CUDA base image）
 3. 啟動 container `claude-sandbox-<name>`，自動分配 SSH port
 4. 套用 CPU 和記憶體資源限制
-5. 把你的 Claude 設定檔（skills、plugins、settings、credentials）和 tmux 設定複製進 container
+5. 把你的 Claude 設定檔（skills、plugins、hooks、settings、credentials）和 tmux 設定複製進 container（由 `sync-config.sh` 負責）
 6. 在 Linux server 的 `~/.ssh/config` 加一筆 `Host sandbox-<name>`
 
 **執行完畢後，你在 Linux server 上就可以 `ssh sandbox-<name>` 直連 container 了。**
@@ -255,6 +255,7 @@ Host sandbox-project-b
 | 停止 container | `docker stop claude-sandbox-<name>` |
 | 完全移除 container | `docker rm -f claude-sandbox-<name>` |
 | 重新 build | `./setup.sh <name>`（會自動砍掉舊的再建） |
+| 只重新同步 Claude 設定 | `./sync-config.sh <name>`（不重建，`~/workspace` 保留） |
 | 列出所有實例 | `docker ps --filter name=claude-sandbox-` |
 
 ## 常見問題
