@@ -20,7 +20,9 @@ GPU_ARGS=()
 if [ "$SANDBOX_CUDA" = "1" ]; then
     IMAGE_NAME="${IMAGE_NAME}-cuda"
     BASE_IMAGE="$CUDA_BASE_IMAGE"
-    GPU_ARGS=(--gpus all)
+    # CDI, unlike --gpus, registers the GPUs in the container's device cgroup,
+    # so a host `systemctl daemon-reload` doesn't revoke them.
+    GPU_ARGS=(--device nvidia.com/gpu=all)
 fi
 if [ "$SANDBOX_BROWSER" = "1" ]; then
     BUILD_TARGET="browser"

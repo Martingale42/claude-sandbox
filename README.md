@@ -71,7 +71,7 @@ SANDBOX_CPUS=8 SANDBOX_MEMORY=16g ./setup.sh heavy-job
 SANDBOX_BROWSER=1 ./setup.sh my-frontend
 ```
 
-需要 NVIDIA GPU（CUDA 12.6 toolkit + `--gpus all`，host 需裝 NVIDIA Container Toolkit）：
+需要 NVIDIA GPU（CUDA 12.6 toolkit + 所有 GPU，host 需裝 NVIDIA Container Toolkit 並產生 CDI spec）：
 
 ```bash
 SANDBOX_CUDA=1 SANDBOX_CPUS=16 SANDBOX_MEMORY=32g ./setup.sh my-gpu-project

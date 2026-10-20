@@ -430,7 +430,7 @@ Claude 想要執行：rm -rf node_modules
 
 > **Note:** Chromium 和 Playwright 只在用 `SANDBOX_BROWSER=1` 建立的實例中可用。base 版不含瀏覽器，image 較小。
 >
-> CUDA toolkit 和 GPU 只在用 `SANDBOX_CUDA=1` 建立的實例中可用；這類實例以 `--gpus all` 啟動，看得到 host 上所有 GPU。
+> CUDA toolkit 和 GPU 只在用 `SANDBOX_CUDA=1` 建立的實例中可用；這類實例以 `--device nvidia.com/gpu=all` 啟動，看得到 host 上所有 GPU。
 
 ### 為什麼 credentials 需要特別處理？
 

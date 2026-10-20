@@ -38,7 +38,7 @@
 │  │  + Chromium + Playwright (SANDBOX_BROWSER=1)           │   │      │
 │  └────────────────────────────────────────────────────────┘   │      │
 │  ┌─ claude-sandbox-small-vllm (cuda) ─────────────────────┐   │      │
-│  │  (--cpus=16 --memory=32g --gpus all)                   │   │      │
+│  │  (--cpus=16 --memory=32g --device nvidia.com/gpu=all)  │   │      │
 │  │  ...（同上結構）                                        │   │      │
 │  │  + CUDA 12.6 toolkit: nvcc, ncu (SANDBOX_CUDA=1)       │   │      │
 │  └────────────────────────────────────────────────────────┘   │      │
@@ -68,7 +68,7 @@ Port 分配策略：從 2222 開始遞增，自動尋找下一個可用 port。�
 | `SANDBOX_CPUS` | `4` | CPU 核心數限制 |
 | `SANDBOX_MEMORY` | `8g` | 記憶體限制 |
 | `SANDBOX_BROWSER` | `0` | 設為 `1` 啟用 Chromium + Playwright |
-| `SANDBOX_CUDA` | `0` | 設為 `1` 改用 CUDA 12.6 devel base image 並加上 `--gpus all` |
+| `SANDBOX_CUDA` | `0` | 設為 `1` 改用 CUDA 12.6 devel base image 並透過 CDI 掛上所有 GPU |
 
 ```bash
 # 例：分配 8 CPUs 和 16GB RAM
@@ -222,11 +222,12 @@ Dockerfile 開頭是 `ARG BASE_IMAGE=ubuntu:24.04` 與 `FROM ${BASE_IMAGE} AS ba
 | 項目 | 說明 |
 |------|------|
 | CUDA 12.6 toolkit | `/usr/local/cuda/bin/` 下的 `nvcc`、`ncu` 與 cuBLAS 等開發用 header/library |
-| GPU 存取 | `docker run --gpus all` 由 NVIDIA Container Toolkit 注入 driver library 與 `nvidia-smi` |
+| GPU 存取 | `docker run --device nvidia.com/gpu=all` 依 host 的 CDI spec 注入 GPU device、driver library 與 `nvidia-smi` |
 
 兩個值得注意的地方：
 
 - **PATH**：CUDA image 用 Docker `ENV` 把 `/usr/local/cuda/bin` 加進 PATH，但 sshd 開的 session 不繼承 `ENV`，所以 Dockerfile 在偵測到 `/usr/local/cuda/bin` 時把它寫進 `/etc/environment`。
+- **CDI 而非 `--gpus all`**：`--gpus all` 透過 hook 注入 GPU，不會登記在 container 的 device cgroup 規則裡，host 只要執行 `systemctl daemon-reload`，systemd 重寫規則後 container 就會出現 `Failed to initialize NVML: Unknown Error`。CDI 把 GPU 寫進 OCI spec，systemd 重寫時會保留。CDI spec 由 host 端 `nvidia-ctk cdi generate` 產生，`docker info` 的 `CDI spec directories` 下要看得到 `nvidia.com/gpu=all`。
 - **UID**：`ubuntu:24.04` 和 `nvidia/cuda` 的 ubuntu24.04 image 都自帶 UID 1000 的 `ubuntu` 使用者，`useradd claude` 因此拿到 UID 1001；兩種 base 行為一致，不需要另外處理。
 
 #### browser stage
@@ -262,7 +263,7 @@ tail -f /dev/null # 讓 PID 1 永遠存活，container 不會退出
 - Port 已分配就複用
 - SSH config 用 marker 確保可覆寫
 
-接受一個 `<name>` 參數（預設 `default`），支援 `SANDBOX_CPUS`、`SANDBOX_MEMORY`、`SANDBOX_BROWSER` 和 `SANDBOX_CUDA` 環境變數。根據 `SANDBOX_BROWSER` 選擇 build target（`base` 或 `browser`），根據 `SANDBOX_CUDA` 選擇 `BASE_IMAGE` build arg 與是否加 `--gpus all`，兩者共同決定 image tag。
+接受一個 `<name>` 參數（預設 `default`），支援 `SANDBOX_CPUS`、`SANDBOX_MEMORY`、`SANDBOX_BROWSER` 和 `SANDBOX_CUDA` 環境變數。根據 `SANDBOX_BROWSER` 選擇 build target（`base` 或 `browser`），根據 `SANDBOX_CUDA` 選擇 `BASE_IMAGE` build arg 與是否用 CDI 掛上 GPU，兩者共同決定 image tag。
 
 #### docker cp 的目錄陷阱
 
