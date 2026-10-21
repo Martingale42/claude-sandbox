@@ -23,7 +23,10 @@ echo "→ Syncing Claude configuration..."
 
 docker cp "$HOME/.claude/CLAUDE.md" "$CONTAINER_NAME:$CONTAINER_HOME/.claude/CLAUDE.md"
 docker exec "$CONTAINER_NAME" rm -rf "$CONTAINER_HOME/.claude/skills" "$CONTAINER_HOME/.claude/plugins" "$CONTAINER_HOME/.claude/hooks"
-docker cp "$HOME/.claude/skills" "$CONTAINER_NAME:$CONTAINER_HOME/.claude/skills"
+
+# Skills are often symlinks into a checkout outside ~/.claude, so copy their targets
+docker exec "$CONTAINER_NAME" mkdir -p "$CONTAINER_HOME/.claude/skills"
+tar -chf - -C "$HOME/.claude/skills" . | docker exec -i "$CONTAINER_NAME" tar -xf - -C "$CONTAINER_HOME/.claude/skills"
 docker cp "$HOME/.claude/plugins" "$CONTAINER_NAME:$CONTAINER_HOME/.claude/plugins"
 if [ -d "$HOME/.claude/hooks" ]; then
     docker cp "$HOME/.claude/hooks" "$CONTAINER_NAME:$CONTAINER_HOME/.claude/hooks"
